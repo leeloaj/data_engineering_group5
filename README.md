@@ -8,9 +8,10 @@ Provide automated listening statistics and audio characteristic insights to crea
 
 ## Data sources
 
-- [Spotify Charts dataset](https://www.kaggle.com/datasets/dhruvildave/spotify-charts): historical chart positions and stream counts.
 - [Spotify Web API](https://developer.spotify.com/documentation/web-api/reference/get-track): track and artist metadata.
 - [ReccoBeats API](https://reccobeats.com/docs/apis/get-audio-features): track audio features.
+- [Spotify Charts dataset](https://www.kaggle.com/datasets/dhruvildave/spotify-charts): historical chart positions and stream counts.
+- [Spotify Charts](charts.spotify.com): recent day/week csv download.
 
 Datasets are linked using Spotify track IDs. Stream totals cover observations available in the selected charts.
 
