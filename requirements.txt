@@ -1,0 +1,3 @@
+# For requesting in Python
+requests
+python-dotenv
