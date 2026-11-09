@@ -1,3 +1,5 @@
-# For requesting in Python
 requests
 python-dotenv
+psycopg[binary]
+pycountry
+kagglehub>=1.0.3

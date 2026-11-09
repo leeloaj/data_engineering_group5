@@ -41,20 +41,21 @@ def chart_entry_to_row(entry):
         "streams": chart_data["rankingMetric"]["value"],
     }
 
-def get_charts_data(token, date="2026-11-02", region="global"):
+def get_charts_data(token, date="2026-11-02", region="global", period="daily"):
     """
     Fetches the Spotify charts data for a given date and region using the provided bearer token.
     
     Args:
         token (str): The bearer token for authentication.
-        date (str): The date for which to fetch the charts data.
+        date (str): The chart date, or "latest".
         region (str): The region for which to fetch the charts data.
+        period (str): "daily" or "weekly".
 
     Returns:
         dict: The JSON response containing the charts data.
     """
     response = requests.get(
-        f"https://charts-spotify-com-service.spotify.com/auth/v0/charts/regional-{region}-daily/{date}",
+        f"https://charts-spotify-com-service.spotify.com/auth/v0/charts/regional-{region}-{period}/{date}",
         headers={"Authorization": f"Bearer {token}"},
         timeout=10,
     )
@@ -63,7 +64,7 @@ def get_charts_data(token, date="2026-11-02", region="global"):
     return response.json()
 
 
-def save_charts_to_csv(chart, date, region, output_dir="data"):
+def save_charts_to_csv(chart, date, region, output_dir="data", period="daily"):
     """
     Saves the Spotify charts data with track IDs to a CSV file.
 
@@ -73,7 +74,8 @@ def save_charts_to_csv(chart, date, region, output_dir="data"):
         region (str): The region for which the charts data was fetched.
         output_dir (str or Path): Output directory, created if needed.
     """
-    output_path = Path(output_dir) / f"charts_data_{date}_{region}.csv"
+    suffix = "_weekly" if period == "weekly" else ""
+    output_path = Path(output_dir) / f"charts_data_{date}_{region}{suffix}.csv"
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with output_path.open("w", newline="", encoding="utf-8") as csv_file:
         writer = csv.DictWriter(csv_file, fieldnames=CHART_FIELDS)
