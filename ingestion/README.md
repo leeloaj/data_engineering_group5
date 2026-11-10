@@ -1,21 +1,23 @@
 # Bronze ingestion details
 
-See the [project README](../README.md#commands) for command examples. The [bronze schema](../sql/bronze.sql) defines the tables described below.
+See the [project README](../README.md#bronze-ingestion) for command examples. The [bronze schema](../sql/bronze.sql) defines the tables described below.
 
 ## Setup and credentials
 
-Use Python 3.11+ and a running PostgreSQL database. From the repository root, install dependencies with `python -m pip install -r requirements.txt`. Set `DATABASE_URL` in your environment or in a local `.env` based on [`.env.example`](../.env.example). The loaders create the `bronze` schema and tables on first run, so the database user needs permission to create the schema.
+Use Python 3.10+. From the repository root, install dependencies with `python -m pip install -r requirements.txt` and set `DATABASE_URL` in your environment or in a local `.env` based on [`.env.example`](../.env.example). The loaders create the `bronze` schema and tables on first run, so the database user needs permission to create the schema.
 
-- **Spotify Charts** uses `SPOTIFY_CHARTS_TOKEN` or the existing `BEARER_TOKEN` for daily and weekly chart downloads. Renew this token when it expires.
+- **Spotify Charts** uses `SPOTIFY_CHARTS_TOKEN` or the existing `BEARER_TOKEN` for daily and weekly chart downloads. When the token expires, paste the replacement into `.env` or update the worker secret if Airflow supplies it. Use the raw token value without the `Bearer ` prefix.
 - **Spotify Web API** uses `SPOTIFY_CLIENT_ID` and `SPOTIFY_CLIENT_SECRET` to obtain and renew track metadata access tokens. You can supply `SPOTIFY_ACCESS_TOKEN` directly instead. These credentials are separate from the Charts token. Development Mode app owners need Spotify Premium. [Spotify client credentials](https://developer.spotify.com/documentation/web-api/tutorials/client-credentials-flow), [Spotify quota modes](https://developer.spotify.com/documentation/web-api/concepts/quota-modes).
 - **KaggleHub** uses its standard credential configuration if Kaggle requires sign-in for the backfill. [KaggleHub authentication](https://github.com/Kaggle/kagglehub#authenticate).
-- **ReccoBeats** and local CSV ingestion require no API token on their own. Adding `--enrich` to a chart command also runs Spotify metadata enrichment and requires Web API credentials.
+- **ReccoBeats** and local CSV ingestion require no API token on their own. `--enrich` runs both enrichment sources by default. Use `--enrichment-source reccobeats` to fetch audio features without Spotify Web API credentials.
 
 ## Charts
 
 `--kaggle` downloads and caches the historical archive through KaggleHub and loads its `charts.csv`. During long stages it prints elapsed time every 30 seconds. The stages cover download or cache resolution, file hashing, PostgreSQL staging, and the final merge. Staging reports rows sent and average rows per second. The final line reports committed inserts, duplicates skipped, and elapsed time.
 
 `--latest` uses Spotify's published chart date. It reads the authenticated feed behind the daily or weekly chart page. Weekly observations use `chart_type = 'top200_weekly'`. [Kaggle archive](https://www.kaggle.com/datasets/dhruvildave/spotify-charts), [Spotify daily charts](https://charts.spotify.com/charts/view/regional-global-daily/latest), [Spotify weekly charts](https://charts.spotify.com/charts/view/regional-global-weekly/latest).
+
+Add `--output-dir data/exports` with `--latest`, `--kaggle`, or a local CSV to write files without connecting to PostgreSQL. The latest chart filename includes the published date, region, and a `_weekly` suffix for weekly charts. Kaggle and local inputs retain their filename and contents. You can pass the saved CSV to the database loader later.
 
 The latest chart defaults to global. Use `--region EE` for Estonia or specify another region. Schedule recurring runs after Spotify publishes the chart. With `--enrich`, use `--enrichment-limit 100` to cap requests per source on a run, for example after a historical backfill.
 
@@ -29,9 +31,13 @@ The loader reads distinct Spotify IDs from the bronze chart table. Spotify uses 
 
 `bronze.track_enrichment` stores one row per source, snapshot date, market, and Spotify ID. The market is empty for ReccoBeats. Rows record UTC ingestion time, status, and the complete response JSON in `raw_json` when available. An empty ReccoBeats result or HTTP 404 is recorded as `missing`. Authentication failures, throttling, and other request errors stop the run with an error.
 
-`--enrich` on the chart loader and `--new-only` on the standalone enrichment loader skip IDs with an existing result for that source and market. For a refresh or to retry missing tracks, run standalone enrichment on a new snapshot date without `--new-only`.
+In database mode, `--enrich` on the chart loader and `--new-only` on the standalone enrichment loader skip IDs with an existing result for that source and market. For a refresh or to retry missing tracks, run standalone enrichment on a new snapshot date without `--new-only`.
 
-Load charts before standalone enrichment. Rerun with the same `--input-date` to resume at unprocessed IDs. The date defaults to today in UTC.
+In file mode, `--enrich` reads distinct track IDs from the exported chart and writes one `.jsonl` file per enrichment source. Each line includes the requested Spotify ID, lookup status, market, and response JSON. The standalone command can also use `--csv` with `--output-dir`. Each run reads the selected CSV again, and a completed file replaces any file of the same name. Use `--enrichment-limit` on the chart command or `--limit` on the standalone command to cap API requests per source.
+
+In database mode, load charts before standalone enrichment and rerun with the same `--input-date` to resume at unprocessed IDs. The snapshot date defaults to today in UTC in both modes.
+
+Both standalone enrichment and `--enrich` report track selection and API progress for each source. Long stages print elapsed time every 30 seconds, along with the number of results saved during enrichment.
 
 ## Ingestion files
 

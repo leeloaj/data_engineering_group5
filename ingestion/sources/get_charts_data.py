@@ -11,9 +11,6 @@ from dotenv import load_dotenv
 import requests
 
 
-# python -m pip install requests
-# python -m pip install python-dotenv
-
 CHART_FIELDS = [
     "rank",
     "id",
@@ -26,13 +23,20 @@ CHART_FIELDS = [
 ]
 
 
+def get_charts_token():
+    return os.getenv("SPOTIFY_CHARTS_TOKEN") or os.getenv("BEARER_TOKEN")
+
+
 def chart_entry_to_row(entry):
     """Flatten one chart entry into the CSV columns."""
     chart_data = entry["chartEntryData"]
     track = entry["trackMetadata"]
+    track_uri = track["trackUri"]
+    if not isinstance(track_uri, str) or not track_uri:
+        raise ValueError("Spotify Charts entry has no track URI")
     return {
         "rank": chart_data["currentRank"],
-        "id": track["trackUri"].removeprefix("spotify:track:"),
+        "id": track_uri.removeprefix("spotify:track:"),
         "artist_names": ", ".join(artist["name"] for artist in track["artists"]),
         "track_name": track["trackName"],
         "source": ", ".join(label["name"] for label in track["labels"]),
@@ -76,13 +80,28 @@ def save_charts_to_csv(chart, date, region, output_dir="data", period="daily"):
     """
     suffix = "_weekly" if period == "weekly" else ""
     output_path = Path(output_dir) / f"charts_data_{date}_{region}{suffix}.csv"
+    entries = chart["entries"]
+    if not isinstance(entries, list):
+        raise ValueError("Spotify Charts response must contain an entries list")
+    if not entries:
+        raise ValueError("Spotify Charts returned no entries")
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    with output_path.open("w", newline="", encoding="utf-8") as csv_file:
-        writer = csv.DictWriter(csv_file, fieldnames=CHART_FIELDS)
-        writer.writeheader()
-        writer.writerows(chart_entry_to_row(entry) for entry in chart["entries"])
+    temporary_path = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w", newline="", encoding="utf-8", dir=output_path.parent,
+            prefix=output_path.name + ".", suffix=".tmp", delete=False,
+        ) as csv_file:
+            temporary_path = Path(csv_file.name)
+            writer = csv.DictWriter(csv_file, fieldnames=CHART_FIELDS)
+            writer.writeheader()
+            writer.writerows(chart_entry_to_row(entry) for entry in entries)
+        os.replace(temporary_path, output_path)
+    finally:
+        if temporary_path is not None:
+            temporary_path.unlink(missing_ok=True)
 
-    print(f"Saved {len(chart['entries'])} entries to {output_path}")
+    print(f"Saved {len(entries)} entries to {output_path}", flush=True)
     return output_path
 
 
@@ -154,9 +173,9 @@ def save_multiple_charts_to_csv(
 
 if __name__ == "__main__":
     load_dotenv()
-    token = os.getenv("BEARER_TOKEN")
+    token = get_charts_token()
     if not token:
-        raise ValueError("Set BEARER_TOKEN in your environment or .env file")
+        raise ValueError("Set SPOTIFY_CHARTS_TOKEN (or BEARER_TOKEN) for Spotify Charts")
 
     save_multiple_charts_to_csv(
         token,
