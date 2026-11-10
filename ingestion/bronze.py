@@ -20,6 +20,7 @@ REGION_ALIASES = {
     "south korea": "KR",
     "taiwan": "TW",
     "tanzania": "TZ",
+    "turkey": "TR",
     "united states of america": "US",
     "venezuela": "VE",
     "vietnam": "VN",
