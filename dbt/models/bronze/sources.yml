@@ -1,0 +1,60 @@
+version: 2
+
+# The only place that names bronze tables. The tables themselves are created
+# by the ingestion package (sql/bronze.sql); see ingestion/README.md.
+sources:
+  - name: bronze
+    schema: bronze
+    description: Raw data as loaded by the ingestion package, not yet cleaned.
+    tables:
+      - name: chart_entries
+        description: >
+          One row per chart observation from Spotify Charts (live downloads)
+          or the Kaggle archive. The first load of a given source, date,
+          region, chart type and track wins; reruns skip existing keys.
+        columns:
+          - name: source
+            description: "'spotify_charts' (live) or 'kaggle_spotify_charts' (historical archive)."
+          - name: ingested_at
+            description: UTC time the row was loaded.
+          - name: input_file
+            description: File the row came from.
+          - name: input_sha256
+            description: SHA-256 of the input file.
+          - name: chart_date
+            description: Chart date.
+          - name: region
+            description: Normalised region code ("GLOBAL" or ISO 3166-1 alpha-2).
+          - name: chart_type
+            description: "'top200', 'viral50' or 'top200_weekly'."
+          - name: spotify_track_id
+            description: Spotify track ID (22 characters).
+          - name: rank
+            description: Chart position.
+          - name: streams
+            description: Streams for this observation; NULL when the chart has none (viral50).
+          - name: raw_row
+            description: >
+              All original CSV fields as JSON. Live CSVs use track_name and
+              artist_names; the Kaggle archive uses title and artist.
+
+      - name: track_enrichment
+        description: >
+          One row per enrichment source, snapshot date (input_date), market and
+          track, holding the full API response. Spotify Web API rows give track
+          metadata, popularity and artists; ReccoBeats rows give audio features.
+        columns:
+          - name: source
+            description: "'spotify_web_api' or 'reccobeats'."
+          - name: ingested_at
+            description: UTC time the row was loaded.
+          - name: input_date
+            description: Snapshot date of the enrichment run.
+          - name: spotify_track_id
+            description: Spotify track ID that was requested.
+          - name: market
+            description: Spotify catalog market; empty for ReccoBeats.
+          - name: status
+            description: "'found' or 'missing'."
+          - name: raw_json
+            description: Complete API response.

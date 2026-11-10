@@ -101,6 +101,26 @@ Set variables in your environment or a local `.env` based on [`.env.example`](.e
 
 [Detailed ingestion guide](ingestion/README.md)
 
+## Transformation (dbt)
+
+dbt builds the silver and gold layers (the star schema) from the bronze tables, so load bronze first. Tested with dbt 1.10.
+
+In Docker, dbt is installed in the Airflow image and `compose.yml` sets the connection:
+
+```sh
+docker compose exec airflow-scheduler bash -c "cd /opt/airflow/dbt && dbt build"
+```
+
+On your own machine (Python 3.13 or older), dbt connects to `warehouse-db` on port 5433 with the `.env.example` defaults:
+
+```sh
+python -m pip install "dbt-core==1.10.23" "dbt-postgres==1.10.2"
+cd dbt
+dbt build --profiles-dir .   # build all models and run all tests
+```
+
+[Detailed dbt guide](dbt/README.md)
+
 ## Files
 
 - [Report.pdf](docs/Report1.pdf): business brief, architecture, model, data dictionary, contributions, and AI disclosure, table definitions, pseudo SQL answering the five business questions.

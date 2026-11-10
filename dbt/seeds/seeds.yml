@@ -1,0 +1,13 @@
+version: 2
+
+seeds:
+  - name: spotify_regions
+    description: >
+      Regions available on Spotify Charts (from the charts API country filter),
+      with a fixed surrogate key and continent. Source for dim_country.
+    config:
+      column_types:
+        country_key: integer
+        country_code: varchar(10)
+        country_name: varchar(100)
+        region: varchar(100)

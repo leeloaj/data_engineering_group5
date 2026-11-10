@@ -1,0 +1,141 @@
+version: 2
+
+models:
+  - name: stg_chart_entries
+    description: >
+      Chart observations from live Spotify Charts and the Kaggle archive, with
+      track and artist names extracted from raw_row. When both sources cover
+      the same chart, the live row wins. Grain: one track x region x chart
+      type x date.
+    data_tests:
+      - unique_combination:
+          arguments:
+            columns: [track_id, region_code, chart_type, chart_date]
+    columns:
+      - name: chart_date
+        description: Chart date.
+        data_tests: [not_null]
+      - name: region_code
+        description: Region code ("GLOBAL", "EE", ...).
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_country')
+                field: country_code
+      - name: chart_type
+        description: "'top200', 'viral50' or 'top200_weekly'."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [top200, viral50, top200_weekly]
+      - name: track_id
+        description: Spotify track ID.
+        data_tests: [not_null]
+      - name: track_name
+        description: Track title as shown on the chart.
+      - name: artist_names
+        description: Artist names as shown on the chart (free text, comma-separated).
+      - name: chart_position
+        description: Chart position.
+        data_tests:
+          - not_null
+          - value_between:
+              arguments:
+                min_value: 1
+                max_value: 200
+      - name: streams
+        description: Streams; NULL for charts without stream counts (viral50).
+        data_tests:
+          - value_between:
+              arguments:
+                min_value: 0
+      - name: chart_source
+        description: "'spotify_charts' or 'kaggle_spotify_charts'."
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [spotify_charts, kaggle_spotify_charts]
+      - name: input_file
+        description: File the row came from.
+      - name: ingested_at
+        description: When the row was loaded into bronze; drives incremental loads.
+        data_tests: [not_null]
+
+  - name: stg_spotify_track_snapshots
+    description: >
+      Spotify Web API track metadata. Grain: one track x snapshot date (each
+      enrichment run is a snapshot). is_latest marks each track's newest one.
+    data_tests:
+      - unique_combination:
+          arguments:
+            columns: [track_id, snapshot_date]
+    columns:
+      - name: track_id
+        description: Requested Spotify track ID (matches the chart data even if Spotify relinked it).
+        data_tests: [not_null]
+      - name: snapshot_date
+        description: Enrichment snapshot date.
+        data_tests: [not_null]
+      - name: popularity
+        description: Spotify popularity score at the snapshot (0-100).
+        data_tests:
+          - value_between:
+              arguments:
+                min_value: 0
+                max_value: 100
+      - name: release_date
+        description: Album release date; year/month precision dates use the first day of the period.
+      - name: release_date_precision
+        description: "'day', 'month' or 'year'."
+      - name: artists
+        description: Spotify artists array (JSON), in credit order.
+      - name: is_latest
+        description: True for the track's newest snapshot.
+
+  - name: stg_spotify_track_artists
+    description: One row per track x credited artist, from the latest snapshot.
+    data_tests:
+      - unique_combination:
+          arguments:
+            columns: [track_id, artist_id]
+    columns:
+      - name: track_id
+        description: Spotify track ID.
+        data_tests: [not_null]
+      - name: artist_id
+        description: Spotify artist ID.
+        data_tests: [not_null]
+      - name: artist_name
+        description: Artist name.
+        data_tests: [not_null]
+      - name: artist_order
+        description: Position in the credits; 1 = primary artist.
+        data_tests: [not_null]
+
+  - name: stg_audio_features
+    description: ReccoBeats audio features, one row per track (latest snapshot).
+    columns:
+      - name: track_id
+        description: Spotify track ID.
+        data_tests: [unique, not_null]
+      - name: danceability
+        description: 0-1.
+        data_tests:
+          - value_between:
+              arguments: {min_value: 0, max_value: 1}
+      - name: energy
+        description: 0-1.
+        data_tests:
+          - value_between:
+              arguments: {min_value: 0, max_value: 1}
+      - name: valence
+        description: 0-1.
+        data_tests:
+          - value_between:
+              arguments: {min_value: 0, max_value: 1}
+      - name: tempo
+        description: Beats per minute.
+      - name: loudness
+        description: Decibels (usually negative).

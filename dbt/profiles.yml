@@ -1,0 +1,16 @@
+# Connection settings use the same WAREHOUSE_DB_* variables as compose.yml and
+# .env.example. Inside Docker, compose.yml sets them to the warehouse-db
+# container. On your own machine, the defaults below match .env.example, so
+# dbt connects to the warehouse-db container through port 5433.
+creator_analytics:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: "{{ env_var('WAREHOUSE_DB_HOST', 'localhost') }}"
+      port: "{{ env_var('WAREHOUSE_DB_PORT', '5433') | int }}"
+      user: "{{ env_var('WAREHOUSE_DB_USER', 'warehouse') }}"
+      password: "{{ env_var('WAREHOUSE_DB_PASSWORD', 'warehouse') }}"
+      dbname: "{{ env_var('WAREHOUSE_DB_NAME', 'warehouse') }}"
+      schema: public
+      threads: 4

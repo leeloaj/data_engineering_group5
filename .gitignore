@@ -2,3 +2,9 @@
 __pycache__
 .vscode
 .venv
+
+# dbt build output
+dbt/target/
+dbt/logs/
+dbt/dbt_packages/
+dbt/.user.yml

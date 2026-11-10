@@ -1,0 +1,214 @@
+version: 2
+
+models:
+  - name: dim_date
+    description: Static calendar table (SCD Type 0), one row per day.
+    columns:
+      - name: date_key
+        description: Date as an integer in YYYYMMDD format.
+        data_tests: [unique, not_null]
+      - name: full_date
+        description: Calendar date.
+        data_tests: [unique, not_null]
+      - name: day
+        description: Day of the month (1-31).
+      - name: month
+        description: Month number (1-12).
+      - name: quarter
+        description: Quarter number (1-4).
+      - name: year
+        description: Four-digit year.
+      - name: is_weekend
+        description: True for Saturday and Sunday.
+
+  - name: dim_country
+    description: >
+      Static table (SCD Type 0) of Spotify chart regions, from the
+      spotify_regions seed. Includes a GLOBAL row for the worldwide chart;
+      exclude it when summing across countries to avoid double counting.
+    columns:
+      - name: country_key
+        description: Surrogate key, fixed in the seed.
+        data_tests: [unique, not_null]
+      - name: country_code
+        description: ISO 3166-1 alpha-2 code, or GLOBAL.
+        data_tests: [unique, not_null]
+      - name: country_name
+        description: Country name as shown by Spotify Charts.
+        data_tests: [not_null]
+      - name: region
+        description: Continent, or "Global" for the worldwide chart.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [Global, Europe, Asia, Africa, North America, South America, Oceania]
+
+  - name: dim_track
+    description: >
+      One row per Spotify track seen on any chart (SCD Type 1, rebuilt each
+      run). Tracks not yet enriched keep their chart title and have NULL
+      Spotify attributes (has_spotify_metadata = false).
+    columns:
+      - name: track_key
+        description: Surrogate key, md5 of track_id.
+        data_tests: [unique, not_null]
+      - name: track_id
+        description: Spotify track ID.
+        data_tests: [unique, not_null]
+      - name: track_title
+        description: Spotify track name, falling back to the chart title.
+        data_tests: [not_null]
+      - name: album_name
+        description: Album name.
+      - name: release_date
+        description: Album release date (BQ5).
+      - name: release_date_precision
+        description: "'day', 'month' or 'year'."
+      - name: duration_ms
+        description: Duration in milliseconds.
+      - name: explicit
+        description: True if the track has explicit lyrics.
+      - name: popularity
+        description: Latest Spotify popularity score (0-100); history is in fact_track_popularity.
+        data_tests:
+          - value_between:
+              arguments: {min_value: 0, max_value: 100}
+      - name: popularity_snapshot_date
+        description: Snapshot date of the popularity score.
+      - name: audio_features
+        description: ReccoBeats audio features as JSON (danceability, energy, valence, tempo, ...).
+      - name: has_spotify_metadata
+        description: False until the Spotify Web API enrichment has found the track.
+        data_tests: [not_null]
+
+  - name: dim_artist
+    description: >
+      One row per Spotify artist credited on an enriched track (SCD Type 1),
+      plus an "Unknown artist" row (artist_id 'unknown') used by fact rows
+      whose track has no Spotify metadata yet.
+    columns:
+      - name: artist_key
+        description: Surrogate key, md5 of artist_id.
+        data_tests: [unique, not_null]
+      - name: artist_id
+        description: Spotify artist ID, or 'unknown'.
+        data_tests: [unique, not_null]
+      - name: artist_name
+        description: Artist name.
+        data_tests: [not_null]
+      - name: artist_genres
+        description: Comma-separated genres. NULL until artist enrichment is ingested.
+
+  - name: bridge_track_artist
+    description: >
+      Track-to-artist links for multi-artist tracks. Join the fact through
+      this table to credit a track's streams to every artist on it.
+    data_tests:
+      - unique_combination:
+          arguments:
+            columns: [track_key, artist_key]
+    columns:
+      - name: track_key
+        description: References dim_track.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments: {to: ref('dim_track'), field: track_key}
+      - name: artist_key
+        description: References dim_artist.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments: {to: ref('dim_artist'), field: artist_key}
+      - name: artist_order
+        description: Position in the credits; 1 = primary artist.
+        data_tests: [not_null]
+      - name: is_primary
+        description: True for the first-listed artist.
+        data_tests: [not_null]
+
+  - name: fact_track_popularity
+    description: >
+      Spotify popularity history (BQ2). Grain: one track x enrichment snapshot
+      date. Grows by one row per track each time enrichment runs.
+    data_tests:
+      - unique_combination:
+          arguments:
+            columns: [track_key, date_key]
+    columns:
+      - name: track_key
+        description: References dim_track.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments: {to: ref('dim_track'), field: track_key}
+      - name: date_key
+        description: Snapshot date, references dim_date.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments: {to: ref('dim_date'), field: date_key}
+      - name: popularity
+        description: Spotify popularity score (0-100).
+        data_tests:
+          - not_null
+          - value_between:
+              arguments: {min_value: 0, max_value: 100}
+
+  - name: fact_track_performance
+    description: >
+      Daily Top 200 chart performance. Grain: one track x one region x one
+      calendar date. Loaded incrementally; re-loading a day replaces its rows.
+      artist_key is the track's primary artist; use bridge_track_artist for
+      all credited artists.
+    data_tests:
+      - unique_combination:
+          arguments:
+            columns: [track_key, country_key, date_key]
+    columns:
+      - name: track_key
+        description: References dim_track.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments: {to: ref('dim_track'), field: track_key}
+      - name: artist_key
+        description: Primary artist, references dim_artist ("Unknown artist" until the track is enriched).
+        data_tests:
+          - not_null
+          - relationships:
+              arguments: {to: ref('dim_artist'), field: artist_key}
+      - name: date_key
+        description: Chart date, references dim_date.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_date')
+                field: date_key
+      - name: country_key
+        description: Chart region, references dim_country.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_country')
+                field: country_key
+      - name: streams
+        description: Streams for this track, region and date.
+        data_tests:
+          - not_null
+          - value_between:
+              arguments:
+                min_value: 0
+      - name: chart_position
+        description: Chart position on this date.
+        data_tests:
+          - not_null
+          - value_between:
+              arguments:
+                min_value: 1
+                max_value: 200
+      - name: ingested_at
+        description: Bronze ingestion time of the source row; drives incremental loads.
+        data_tests: [not_null]

@@ -1,0 +1,77 @@
+country_key,country_code,country_name,region
+1,GLOBAL,Global,Global
+2,AR,Argentina,South America
+3,AU,Australia,Oceania
+4,AT,Austria,Europe
+5,BY,Belarus,Europe
+6,BE,Belgium,Europe
+7,BO,Bolivia,South America
+8,BR,Brazil,South America
+9,BG,Bulgaria,Europe
+10,CA,Canada,North America
+11,CL,Chile,South America
+12,CO,Colombia,South America
+13,CR,Costa Rica,North America
+14,CY,Cyprus,Europe
+15,CZ,Czech Republic,Europe
+16,DK,Denmark,Europe
+17,DO,Dominican Republic,North America
+18,EC,Ecuador,South America
+19,EG,Egypt,Africa
+20,SV,El Salvador,North America
+21,EE,Estonia,Europe
+22,FI,Finland,Europe
+23,FR,France,Europe
+24,DE,Germany,Europe
+25,GR,Greece,Europe
+26,GT,Guatemala,North America
+27,HN,Honduras,North America
+28,HK,Hong Kong,Asia
+29,HU,Hungary,Europe
+30,IS,Iceland,Europe
+31,IN,India,Asia
+32,ID,Indonesia,Asia
+33,IE,Ireland,Europe
+34,IL,Israel,Asia
+35,IT,Italy,Europe
+36,JP,Japan,Asia
+37,KZ,Kazakhstan,Asia
+38,LV,Latvia,Europe
+39,LT,Lithuania,Europe
+40,LU,Luxembourg,Europe
+41,MY,Malaysia,Asia
+42,MX,Mexico,North America
+43,MA,Morocco,Africa
+44,NL,Netherlands,Europe
+45,NZ,New Zealand,Oceania
+46,NI,Nicaragua,North America
+47,NG,Nigeria,Africa
+48,NO,Norway,Europe
+49,PK,Pakistan,Asia
+50,PA,Panama,North America
+51,PY,Paraguay,South America
+52,PE,Peru,South America
+53,PH,Philippines,Asia
+54,PL,Poland,Europe
+55,PT,Portugal,Europe
+56,RO,Romania,Europe
+57,SA,Saudi Arabia,Asia
+58,SG,Singapore,Asia
+59,SK,Slovakia,Europe
+60,ZA,South Africa,Africa
+61,KR,South Korea,Asia
+62,ES,Spain,Europe
+63,SE,Sweden,Europe
+64,CH,Switzerland,Europe
+65,TW,Taiwan,Asia
+66,TH,Thailand,Asia
+67,TR,Turkey,Asia
+68,AE,UAE,Asia
+69,UA,Ukraine,Europe
+70,GB,United Kingdom,Europe
+71,UY,Uruguay,South America
+72,US,USA,North America
+73,VE,Venezuela,South America
+74,VN,Vietnam,Asia
+75,AD,Andorra,Europe
+76,RU,Russia,Europe
