@@ -1,9 +1,8 @@
 -- ============================================================================
 -- IDEMPOTENT INGESTION & SAFE RERUNS
--- Component: Bronze Layer Ingestion (Step 5)
--- Author: Johannes
--- Description: Duplicate-safe INSERT / ON CONFLICT patterns for safe pipeline reruns
---              matching the exact schema in sql/bronze.sql.
+-- Component: Bronze Layer Ingestion
+-- Description: Duplicate-safe INSERT / ON CONFLICT DO NOTHING patterns for safe
+--              pipeline reruns, preserving first-seen raw-source provenance.
 -- ============================================================================
 
 -- 1. Safe Rerun for bronze.chart_entries (First-seen provenance wins / skip duplicates)
@@ -25,7 +24,7 @@ ON CONFLICT (source, chart_date, region, chart_type, spotify_track_id)
 DO NOTHING;
 
 
--- 2. Safe Rerun for bronze.track_enrichment (Update payload if rerun on same snapshot date)
+-- 2. Safe Rerun for bronze.track_enrichment (Preserve first-seen snapshot provenance)
 INSERT INTO bronze.track_enrichment (
     source,
     ingested_at,
@@ -37,7 +36,4 @@ INSERT INTO bronze.track_enrichment (
 )
 VALUES (%s, %s, %s, %s, %s, %s, %s::jsonb)
 ON CONFLICT (source, input_date, market, spotify_track_id)
-DO UPDATE SET
-    ingested_at = EXCLUDED.ingested_at,
-    status = EXCLUDED.status,
-    raw_json = EXCLUDED.raw_json;
+DO NOTHING;
