@@ -7,4 +7,4 @@ select
     {{ hash_key('artist_id') }}     as artist_key,
     artist_order,
     artist_order = 1                as is_primary
-from {{ ref('stg_spotify_track_artists') }}
+from {{ ref('stg_track_artists') }}

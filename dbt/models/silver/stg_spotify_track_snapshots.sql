@@ -1,6 +1,6 @@
 -- Spotify Web API track metadata, one row per track x snapshot date.
--- Every enrichment run is a new snapshot, which gives popularity history
--- (BQ2). If a date was fetched for several markets, the latest load wins.
+-- Every enrichment run is a new snapshot. If a date was fetched for several
+-- markets, the latest load wins.
 
 with source as (
 

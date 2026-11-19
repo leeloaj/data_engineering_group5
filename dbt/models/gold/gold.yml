@@ -69,7 +69,7 @@ models:
       - name: explicit
         description: True if the track has explicit lyrics.
       - name: popularity
-        description: Latest Spotify popularity score (0-100); history is in fact_track_popularity.
+        description: Latest Spotify popularity score (0-100).
         data_tests:
           - value_between:
               arguments: {min_value: 0, max_value: 100}
@@ -83,21 +83,25 @@ models:
 
   - name: dim_artist
     description: >
-      One row per Spotify artist credited on an enriched track (SCD Type 1),
-      plus an "Unknown artist" row (artist_id 'unknown') used by fact rows
-      whose track has no Spotify metadata yet.
+      One row per artist credited on a charted track (SCD Type 1). Artists of
+      enriched tracks come from Spotify; the others come from the chart files
+      (artist_id 'chart:<name>'). Includes an "Unknown artist" row
+      (artist_id 'unknown') for chart rows without an artist name.
     columns:
       - name: artist_key
         description: Surrogate key, md5 of artist_id.
         data_tests: [unique, not_null]
       - name: artist_id
-        description: Spotify artist ID, or 'unknown'.
+        description: Spotify artist ID, 'chart:<name>' for chart-only artists, or 'unknown'.
         data_tests: [unique, not_null]
       - name: artist_name
         description: Artist name.
         data_tests: [not_null]
       - name: artist_genres
         description: Comma-separated genres. NULL until artist enrichment is ingested.
+      - name: has_spotify_metadata
+        description: True if the artist comes from Spotify, false if from the chart files.
+        data_tests: [not_null]
 
   - name: bridge_track_artist
     description: >
@@ -127,10 +131,11 @@ models:
         description: True for the first-listed artist.
         data_tests: [not_null]
 
-  - name: fact_track_popularity
+  - name: fact_track_daily_popularity
     description: >
-      Spotify popularity history (BQ2). Grain: one track x enrichment snapshot
-      date. Grows by one row per track each time enrichment runs.
+      Chart-based popularity history (BQ2). Grain: one track x one
+      calendar date, built from fact_track_performance (daily Top 200).
+      Loaded incrementally.
     data_tests:
       - unique_combination:
           arguments:
@@ -143,17 +148,50 @@ models:
           - relationships:
               arguments: {to: ref('dim_track'), field: track_key}
       - name: date_key
-        description: Snapshot date, references dim_date.
+        description: Chart date, references dim_date.
         data_tests:
           - not_null
           - relationships:
               arguments: {to: ref('dim_date'), field: date_key}
-      - name: popularity
-        description: Spotify popularity score (0-100).
+      - name: global_chart_position
+        description: Position on the worldwide Top 200; NULL if not on it that day.
+        data_tests:
+          - value_between:
+              arguments: {min_value: 1, max_value: 200}
+      - name: global_streams
+        description: Streams on the worldwide chart; NULL if not on it or unknown.
+        data_tests:
+          - value_between:
+              arguments: {min_value: 0}
+      - name: countries_charted
+        description: Number of country Top 200 charts the track is on (GLOBAL excluded).
         data_tests:
           - not_null
           - value_between:
-              arguments: {min_value: 0, max_value: 100}
+              arguments: {min_value: 0}
+      - name: best_country_position
+        description: Best position across country charts; NULL if on no country chart.
+        data_tests:
+          - value_between:
+              arguments: {min_value: 1, max_value: 200}
+      - name: country_streams
+        description: >
+          Streams summed over country charts (GLOBAL excluded). Rows with
+          unknown streams are skipped, so the sum can be slightly low.
+        data_tests:
+          - value_between:
+              arguments: {min_value: 0}
+      - name: chart_points
+        description: >
+          Popularity score: 201 minus the position on each country chart
+          (200 points for #1, 1 for #200), summed over all countries.
+        data_tests:
+          - not_null
+          - value_between:
+              arguments: {min_value: 0}
+      - name: ingested_at
+        description: Latest load time of the underlying fact rows (drives incremental loads).
+        data_tests: [not_null]
 
   - name: fact_track_performance
     description: >
@@ -173,7 +211,7 @@ models:
           - relationships:
               arguments: {to: ref('dim_track'), field: track_key}
       - name: artist_key
-        description: Primary artist, references dim_artist ("Unknown artist" until the track is enriched).
+        description: Primary artist, references dim_artist. From Spotify when the track is enriched, otherwise the first artist named in the chart file.
         data_tests:
           - not_null
           - relationships:
@@ -195,9 +233,14 @@ models:
                 to: ref('dim_country')
                 field: country_key
       - name: streams
-        description: Streams for this track, region and date.
+        description: >
+          Streams for this track, region and date. NULL means the source left
+          the stream count blank (unknown); the row is kept because its chart
+          position is still valid. SUM() skips NULLs.
         data_tests:
-          - not_null
+          - not_null:
+              config:
+                severity: warn
           - value_between:
               arguments:
                 min_value: 0

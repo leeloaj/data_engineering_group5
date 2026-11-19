@@ -7,11 +7,8 @@
 
 with chart_tracks as (
 
-    select distinct on (track_id)
-        track_id,
-        track_name
-    from {{ ref('stg_chart_entries') }}
-    order by track_id, chart_date desc, ingested_at desc
+    select track_id, track_name
+    from {{ ref('stg_chart_tracks') }}
 
 ),
 
